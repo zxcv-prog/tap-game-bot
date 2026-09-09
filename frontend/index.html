@@ -144,7 +144,7 @@
 
   <section id="screen-home" class="screen active">
     <div class="tap-zone">
-      <button id="tap-btn"><img src="/assets/tap-icon.png" alt="탭" /></button>
+      <button id="tap-btn"><img src="/assets/stage1-chicken.jpg" alt="탭" /></button>
     </div>
     <div class="energy-wrap">
       <div class="energy-label"><span>⚡ 에너지</span><span id="energy-text">0 / 0</span></div>
@@ -249,9 +249,35 @@ async function apiPost(path, body) {
   return res.json();
 }
 
+// 탭파워 업그레이드 레벨이 오를수록 탭하는 몬스터가 더 강한 걸로 바뀜 (약한 순 -> 강한 순)
+const MONSTER_STAGES = [
+  { minLevel: 0, src: '/assets/stage1-chicken.jpg' },
+  { minLevel: 3, src: '/assets/stage2-slime.jpg' },
+  { minLevel: 7, src: '/assets/stage3-spider.jpg' },
+  { minLevel: 12, src: '/assets/stage4-zombie.jpg' },
+  { minLevel: 20, src: '/assets/stage5-golem.jpg' },
+];
+let currentMonsterSrc = null;
+let monsterInitialized = false;
+
+function updateMonsterImage(tapLevel) {
+  let chosen = MONSTER_STAGES[0];
+  for (const stage of MONSTER_STAGES) {
+    if (tapLevel >= stage.minLevel) chosen = stage;
+  }
+  if (chosen.src !== currentMonsterSrc) {
+    const isEvolution = monsterInitialized && currentMonsterSrc !== null;
+    currentMonsterSrc = chosen.src;
+    document.querySelector('#tap-btn img').src = chosen.src;
+    if (isEvolution) showToast('✨ 몬스터가 진화했다!');
+  }
+  monsterInitialized = true;
+}
+
 function adoptState(newState) {
   state = newState;
   stateReceivedAt = performance.now();
+  updateMonsterImage(newState.upgrades.tap.level);
   renderShop();
 }
 
