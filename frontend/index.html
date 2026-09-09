@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>코인 타이쿤</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root {
+    --bg: #0f1220;
+    --bg2: #161a2e;
+    --card: #1c2138;
+    --accent: #ffd23f;
+    --accent2: #ff9d3f;
+    --text: #f2f3f7;
+    --muted: #8b90ab;
+    --good: #4ade80;
+    --bad: #ff6b6b;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Malgun Gothic", sans-serif;
+    overflow: hidden; user-select: none;
+  }
+  #app { display: flex; flex-direction: column; height: 100vh; height: 100dvh; }
+
+  header {
+    padding: 14px 16px 8px; text-align: center; flex-shrink: 0;
+  }
+  .coin-count { font-size: 34px; font-weight: 800; letter-spacing: -0.5px; }
+  .coin-count .unit { font-size: 16px; color: var(--muted); font-weight: 600; margin-left: 4px; }
+  .sub-line { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  .screen { flex: 1; overflow-y: auto; padding: 0 16px 16px; display: none; }
+  .screen.active { display: flex; flex-direction: column; }
+
+  /* ===== 홈 (탭) 화면 ===== */
+  #screen-home { align-items: center; justify-content: space-between; }
+  .tap-zone { flex: 1; display: flex; align-items: center; justify-content: center; width: 100%; position: relative; }
+  #tap-btn {
+    width: 62vw; height: 62vw; max-width: 260px; max-height: 260px;
+    border-radius: 50%; border: none; cursor: pointer;
+    background: radial-gradient(circle at 35% 30%, var(--accent), var(--accent2) 70%);
+    box-shadow: 0 10px 0 #b96e12, 0 14px 24px rgba(0,0,0,.4);
+    font-size: 64px; display: flex; align-items: center; justify-content: center;
+    transition: transform .06s, box-shadow .06s;
+  }
+  #tap-btn:active, #tap-btn.pressed {
+    transform: translateY(8px);
+    box-shadow: 0 2px 0 #b96e12, 0 6px 14px rgba(0,0,0,.4);
+  }
+  #tap-btn.depleted { filter: grayscale(.6) brightness(.6); }
+  .floater {
+    position: absolute; pointer-events: none; font-weight: 800; font-size: 22px;
+    color: var(--accent); text-shadow: 0 2px 4px rgba(0,0,0,.5);
+    animation: float-up .8s ease-out forwards;
+  }
+  @keyframes float-up {
+    0% { opacity: 1; transform: translateY(0) scale(1); }
+    100% { opacity: 0; transform: translateY(-70px) scale(1.3); }
+  }
+
+  .energy-wrap { width: 100%; padding: 4px 8px 10px; flex-shrink: 0; }
+  .energy-label { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  .energy-bar-bg { height: 10px; background: var(--card); border-radius: 6px; overflow: hidden; }
+  .energy-bar-fill { height: 100%; background: linear-gradient(90deg, #4ade80, #22d3ee); border-radius: 6px; transition: width .2s; }
+
+  /* ===== 상점 화면 ===== */
+  .upgrade-card {
+    background: var(--card); border-radius: 16px; padding: 14px 16px; margin-top: 12px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .upgrade-emoji { font-size: 30px; width: 44px; text-align: center; }
+  .upgrade-info { flex: 1; min-width: 0; }
+  .upgrade-name { font-weight: 700; font-size: 15px; }
+  .upgrade-desc { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .upgrade-level { font-size: 11px; color: var(--accent); margin-top: 4px; }
+  .buy-btn {
+    flex-shrink: 0; border: none; border-radius: 10px; padding: 10px 12px;
+    background: var(--accent); color: #1a1300; font-weight: 800; font-size: 13px; cursor: pointer;
+    min-width: 76px;
+  }
+  .buy-btn:disabled { background: #33374f; color: var(--muted); }
+
+  /* ===== 순위표 화면 ===== */
+  .rank-row {
+    display: flex; align-items: center; gap: 10px; padding: 10px 4px;
+    border-bottom: 1px solid #232840;
+  }
+  .rank-row.me { background: rgba(255,210,63,.08); border-radius: 10px; }
+  .rank-num { width: 28px; text-align: center; font-weight: 800; color: var(--muted); }
+  .rank-row:nth-child(1) .rank-num { color: #ffd23f; }
+  .rank-row:nth-child(2) .rank-num { color: #cfd3e6; }
+  .rank-row:nth-child(3) .rank-num { color: #d9924a; }
+  .rank-name { flex: 1; font-size: 14px; }
+  .rank-coins { font-weight: 700; font-size: 14px; }
+
+  /* ===== 하단 네비 ===== */
+  nav {
+    display: flex; flex-shrink: 0; border-top: 1px solid #232840; background: var(--bg2);
+  }
+  nav button {
+    flex: 1; background: none; border: none; color: var(--muted); padding: 10px 0 12px;
+    font-size: 11px; display: flex; flex-direction: column; align-items: center; gap: 2px;
+    cursor: pointer;
+  }
+  nav button .icon { font-size: 20px; }
+  nav button.active { color: var(--accent); }
+
+  .center-msg { margin: auto; text-align: center; color: var(--muted); padding: 24px; font-size: 14px; line-height: 1.6; }
+  .toast {
+    position: fixed; left: 50%; bottom: 90px; transform: translateX(-50%);
+    background: #2a2f4a; color: var(--text); padding: 10px 16px; border-radius: 10px;
+    font-size: 13px; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 50;
+    max-width: 80vw; text-align: center;
+  }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="coin-count"><span id="coin-value">0</span><span class="unit">코인</span></div>
+    <div class="sub-line" id="passive-line"></div>
+  </header>
+
+  <section id="screen-home" class="screen active">
+    <div class="tap-zone">
+      <button id="tap-btn">🪙</button>
+    </div>
+    <div class="energy-wrap">
+      <div class="energy-label"><span>⚡ 에너지</span><span id="energy-text">0 / 0</span></div>
+      <div class="energy-bar-bg"><div class="energy-bar-fill" id="energy-fill" style="width:0%"></div></div>
+    </div>
+  </section>
+
+  <section id="screen-shop" class="screen"></section>
+
+  <section id="screen-rank" class="screen"></section>
+
+  <nav>
+    <button data-screen="home" class="active"><span class="icon">🏠</span>홈</button>
+    <button data-screen="shop"><span class="icon">🛒</span>상점</button>
+    <button data-screen="rank"><span class="icon">🏆</span>순위</button>
+  </nav>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const tg = window.Telegram && window.Telegram.WebApp;
+if (tg) {
+  tg.ready();
+  tg.expand();
+  applyTelegramTheme();
+}
+
+function applyTelegramTheme() {
+  const p = tg.themeParams || {};
+  const root = document.documentElement.style;
+  if (p.bg_color) root.setProperty('--bg', p.bg_color);
+  if (p.secondary_bg_color) root.setProperty('--bg2', p.secondary_bg_color);
+  if (p.text_color) root.setProperty('--text', p.text_color);
+  if (p.hint_color) root.setProperty('--muted', p.hint_color);
+}
+
+const initData = tg && tg.initData ? tg.initData : '';
+
+let state = null;          // 서버가 마지막으로 알려준 상태
+let stateReceivedAt = 0;   // 위 상태를 받은 시각(ms, performance.now 기준)
+let pendingTaps = 0;       // 아직 서버로 안 보낸 탭 수
+let flushing = false;
+
+const $ = (sel) => document.querySelector(sel);
+const coinValueEl = $('#coin-value');
+const passiveLineEl = $('#passive-line');
+const energyTextEl = $('#energy-text');
+const energyFillEl = $('#energy-fill');
+const tapBtn = $('#tap-btn');
+const toastEl = $('#toast');
+
+function showToast(msg) {
+  toastEl.textContent = msg;
+  toastEl.classList.add('show');
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(() => toastEl.classList.remove('show'), 1800);
+}
+
+function fmt(n) {
+  return Math.floor(n).toLocaleString('ko-KR');
+}
+
+// 서버 state 기준 + 경과시간으로 현재 코인/에너지를 추정 (자동채굴/에너지 회복을 부드럽게 표시)
+function projectedState() {
+  if (!state) return null;
+  const elapsed = (performance.now() - stateReceivedAt) / 1000;
+  const coins = state.coins + elapsed * state.passive_per_sec + pendingTaps * state.coins_per_tap;
+  const energy = Math.min(state.max_energy, state.energy + elapsed * state.energy_regen_per_sec) - pendingTaps;
+  return { coins: Math.max(0, coins), energy: Math.max(0, Math.min(state.max_energy, energy)) };
+}
+
+function renderTick() {
+  const p = projectedState();
+  if (p) {
+    coinValueEl.textContent = fmt(p.coins);
+    energyTextEl.textContent = `${fmt(p.energy)} / ${state.max_energy}`;
+    energyFillEl.style.width = `${Math.min(100, (p.energy / state.max_energy) * 100)}%`;
+    tapBtn.classList.toggle('depleted', p.energy < 1);
+    passiveLineEl.textContent = state.passive_per_sec > 0
+      ? `초당 +${state.passive_per_sec} (탭당 +${state.coins_per_tap})`
+      : `탭당 +${state.coins_per_tap}`;
+  }
+  requestAnimationFrame(renderTick);
+}
+requestAnimationFrame(renderTick);
+
+async function apiGet(path) {
+  const res = await fetch(path);
+  if (!res.ok) throw await res.json().catch(() => ({ detail: '알 수 없는 오류' }));
+  return res.json();
+}
+async function apiPost(path, body) {
+  const res = await fetch(path, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  });
+  if (!res.ok) throw await res.json().catch(() => ({ detail: '알 수 없는 오류' }));
+  return res.json();
+}
+
+function adoptState(newState) {
+  state = newState;
+  stateReceivedAt = performance.now();
+  renderShop();
+}
+
+async function loadState() {
+  const s = await apiGet(`/api/state?initData=${encodeURIComponent(initData)}`);
+  adoptState(s);
+}
+
+async function flushTaps() {
+  if (flushing || pendingTaps === 0) return;
+  flushing = true;
+  const count = pendingTaps;
+  pendingTaps = 0;
+  try {
+    const s = await apiPost('/api/tap', { initData, count });
+    adoptState(s);
+  } catch (e) {
+    pendingTaps += count; // 실패하면 다음 시도 때 다시 합산
+  } finally {
+    flushing = false;
+  }
+}
+setInterval(flushTaps, 400);
+
+function spawnFloater(x, y, amount) {
+  const el = document.createElement('div');
+  el.className = 'floater';
+  el.textContent = `+${amount}`;
+  el.style.left = `${x}px`;
+  el.style.top = `${y}px`;
+  document.getElementById('screen-home').appendChild(el);
+  setTimeout(() => el.remove(), 800);
+}
+
+function onTap(clientX, clientY) {
+  if (!state) return;
+  const p = projectedState();
+  if (!p || p.energy < 1) {
+    showToast('⚡ 에너지가 부족해! 잠시 기다려줘');
+    return;
+  }
+  pendingTaps += 1;
+  tg && tg.HapticFeedback && tg.HapticFeedback.impactOccurred('light');
+  tapBtn.classList.add('pressed');
+  setTimeout(() => tapBtn.classList.remove('pressed'), 90);
+  const rect = tapBtn.getBoundingClientRect();
+  spawnFloater(clientX - rect.left - 10, clientY - rect.top - 10, state.coins_per_tap);
+}
+
+tapBtn.addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  onTap(e.clientX, e.clientY);
+});
+
+// ===== 상점 =====
+function renderShop() {
+  const el = $('#screen-shop');
+  if (!state) { el.innerHTML = '<div class="center-msg">불러오는 중...</div>'; return; }
+  el.innerHTML = '';
+  for (const [id, u] of Object.entries(state.upgrades)) {
+    const card = document.createElement('div');
+    card.className = 'upgrade-card';
+    const canAfford = state.coins >= u.next_cost;
+    card.innerHTML = `
+      <div class="upgrade-emoji">${u.emoji}</div>
+      <div class="upgrade-info">
+        <div class="upgrade-name">${u.name}</div>
+        <div class="upgrade-desc">${u.desc}</div>
+        <div class="upgrade-level">Lv.${u.level}</div>
+      </div>
+      <button class="buy-btn" ${canAfford ? '' : 'disabled'}>${fmt(u.next_cost)}🪙</button>
+    `;
+    card.querySelector('.buy-btn').addEventListener('click', () => buyUpgrade(id));
+    el.appendChild(card);
+  }
+}
+
+async function buyUpgrade(id) {
+  try {
+    const s = await apiPost('/api/upgrade', { initData, upgrade: id });
+    adoptState(s);
+    showToast('✅ 구매 완료!');
+  } catch (e) {
+    showToast(`❌ ${e.detail || '구매 실패'}`);
+  }
+}
+
+// ===== 순위표 =====
+async function renderRank() {
+  const el = $('#screen-rank');
+  el.innerHTML = '<div class="center-msg">불러오는 중...</div>';
+  try {
+    const list = await apiGet('/api/leaderboard');
+    if (list.length === 0) {
+      el.innerHTML = '<div class="center-msg">아직 아무도 안 했어. 첫 주자가 되어봐!</div>';
+      return;
+    }
+    el.innerHTML = '';
+    const myId = state && state.telegram_id;
+    for (const row of list) {
+      const div = document.createElement('div');
+      div.className = 'rank-row' + (row.telegram_id === myId ? ' me' : '');
+      div.innerHTML = `
+        <div class="rank-num">${row.rank}</div>
+        <div class="rank-name">${row.first_name}${row.telegram_id === myId ? ' (나)' : ''}</div>
+        <div class="rank-coins">${fmt(row.coins)}🪙</div>
+      `;
+      el.appendChild(div);
+    }
+  } catch (e) {
+    el.innerHTML = `<div class="center-msg">순위를 못 불러왔어: ${e.detail || ''}</div>`;
+  }
+}
+
+// ===== 네비게이션 =====
+document.querySelectorAll('nav button').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('nav button').forEach((b) => b.classList.remove('active'));
+    document.querySelectorAll('.screen').forEach((s) => s.classList.remove('active'));
+    btn.classList.add('active');
+    const name = btn.dataset.screen;
+    $(`#screen-${name}`).classList.add('active');
+    if (name === 'rank') renderRank();
+  });
+});
+
+// ===== 시작 =====
+if (!initData) {
+  document.body.innerHTML = '<div class="center-msg" style="height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;">📱 이 게임은 텔레그램 앱 안에서만 열 수 있어.<br>채팅방에서 게임 버튼을 눌러줘.</div>';
+} else {
+  loadState().catch((e) => showToast(`❌ 초기화 실패: ${e.detail || e}`));
+}
+</script>
+</body>
+</html>
