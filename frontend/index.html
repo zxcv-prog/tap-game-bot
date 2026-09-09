@@ -170,6 +170,7 @@ const initData = tg && tg.initData ? tg.initData : '';
 let state = null;          // 서버가 마지막으로 알려준 상태
 let stateReceivedAt = 0;   // 위 상태를 받은 시각(ms, performance.now 기준)
 let pendingTaps = 0;       // 아직 서버로 안 보낸 탭 수
+let inFlightTaps = 0;      // 서버로 보냈지만 아직 응답 안 온 탭 수 (화면 계산에선 계속 포함해야 함)
 let flushing = false;
 
 const $ = (sel) => document.querySelector(sel);
@@ -195,8 +196,9 @@ function fmt(n) {
 function projectedState() {
   if (!state) return null;
   const elapsed = (performance.now() - stateReceivedAt) / 1000;
-  const coins = state.coins + elapsed * state.passive_per_sec + pendingTaps * state.coins_per_tap;
-  const energy = Math.min(state.max_energy, state.energy + elapsed * state.energy_regen_per_sec) - pendingTaps;
+  const unconfirmedTaps = pendingTaps + inFlightTaps; // 서버 응답 기다리는 동안에도 화면에서 빼면 안 됨 (안 그러면 숫자가 순간적으로 줄었다가 다시 튀어오름)
+  const coins = state.coins + elapsed * state.passive_per_sec + unconfirmedTaps * state.coins_per_tap;
+  const energy = Math.min(state.max_energy, state.energy + elapsed * state.energy_regen_per_sec) - unconfirmedTaps;
   return { coins: Math.max(0, coins), energy: Math.max(0, Math.min(state.max_energy, energy)) };
 }
 
@@ -242,13 +244,15 @@ async function loadState() {
 async function flushTaps() {
   if (flushing || pendingTaps === 0) return;
   flushing = true;
-  const count = pendingTaps;
+  inFlightTaps = pendingTaps;
   pendingTaps = 0;
   try {
-    const s = await apiPost('/api/tap', { initData, count });
+    const s = await apiPost('/api/tap', { initData, count: inFlightTaps });
+    inFlightTaps = 0; // 서버가 이미 반영한 값을 adoptState로 받으므로 이제 unconfirmed에서 빼도 됨
     adoptState(s);
   } catch (e) {
-    pendingTaps += count; // 실패하면 다음 시도 때 다시 합산
+    pendingTaps += inFlightTaps; // 실패하면 다음 시도 때 다시 합산
+    inFlightTaps = 0;
   } finally {
     flushing = false;
   }
