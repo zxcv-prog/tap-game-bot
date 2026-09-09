@@ -128,7 +128,7 @@
 
   <section id="screen-home" class="screen active">
     <div class="tap-zone">
-      <button id="tap-btn">🪙</button>
+      <button id="tap-btn">💰</button>
     </div>
     <div class="energy-wrap">
       <div class="energy-label"><span>⚡ 에너지</span><span id="energy-text">0 / 0</span></div>
@@ -305,7 +305,7 @@ function renderShop() {
         <div class="upgrade-desc">${u.desc}</div>
         <div class="upgrade-level">Lv.${u.level}</div>
       </div>
-      <button class="buy-btn" ${canAfford ? '' : 'disabled'}>${fmt(u.next_cost)}🪙</button>
+      <button class="buy-btn" ${canAfford ? '' : 'disabled'}>${fmt(u.next_cost)}💰</button>
     `;
     card.querySelector('.buy-btn').addEventListener('click', () => buyUpgrade(id));
     el.appendChild(card);
@@ -340,7 +340,7 @@ async function renderRank() {
       div.innerHTML = `
         <div class="rank-num">${row.rank}</div>
         <div class="rank-name">${row.first_name}${row.telegram_id === myId ? ' (나)' : ''}</div>
-        <div class="rank-coins">${fmt(row.coins)}🪙</div>
+        <div class="rank-coins">${fmt(row.coins)}💰</div>
       `;
       el.appendChild(div);
     }
