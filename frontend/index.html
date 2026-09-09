@@ -97,6 +97,22 @@
   .rank-name { flex: 1; font-size: 14px; }
   .rank-coins { font-weight: 700; font-size: 14px; }
 
+  /* ===== 펫 화면 ===== */
+  #screen-pet { align-items: center; text-align: center; padding-top: 12px; }
+  .pet-name { font-size: 18px; font-weight: 700; margin-top: 4px; }
+  .pet-stage-name { font-size: 13px; color: var(--muted); margin-top: 2px; }
+  .pet-emoji { font-size: 96px; line-height: 1; margin: 10px 0; filter: drop-shadow(0 8px 12px rgba(0,0,0,.4)); }
+  .pet-growth-wrap { width: 100%; margin-top: 6px; }
+  .pet-growth-label { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  .pet-growth-bar-bg { height: 10px; background: var(--card); border-radius: 6px; overflow: hidden; }
+  .pet-growth-bar-fill { height: 100%; background: linear-gradient(90deg, #a78bfa, #f472b6); border-radius: 6px; transition: width .3s; }
+  .feed-btn {
+    margin-top: 20px; border: none; border-radius: 14px; padding: 14px 28px;
+    background: var(--accent); color: #1a1300; font-weight: 800; font-size: 16px; cursor: pointer;
+  }
+  .feed-btn:disabled { background: #33374f; color: var(--muted); }
+  .pet-coin-line { font-size: 12px; color: var(--muted); margin-top: 8px; }
+
   /* ===== 하단 네비 ===== */
   nav {
     display: flex; flex-shrink: 0; border-top: 1px solid #232840; background: var(--bg2);
@@ -140,10 +156,13 @@
 
   <section id="screen-rank" class="screen"></section>
 
+  <section id="screen-pet" class="screen"></section>
+
   <nav>
     <button data-screen="home" class="active"><span class="icon">🏠</span>홈</button>
     <button data-screen="shop"><span class="icon">🛒</span>상점</button>
     <button data-screen="rank"><span class="icon">🏆</span>순위</button>
+    <button data-screen="pet"><span class="icon">🐾</span>펫</button>
   </nav>
 </div>
 <div class="toast" id="toast"></div>
@@ -349,6 +368,55 @@ async function renderRank() {
   }
 }
 
+// ===== 펫 =====
+let petState = null;
+let petTabActive = false;
+let petPollTimer = null;
+
+function renderPetScreen() {
+  const el = $('#screen-pet');
+  if (!petState) { el.innerHTML = '<div class="center-msg">불러오는 중...</div>'; return; }
+  const p = petState;
+  const s = p.stage;
+  const coins = state ? Math.floor(state.coins) : 0;
+  const canFeed = coins >= p.feed_cost;
+  const progress = s.is_max ? 100 : Math.min(100, (p.growth / s.next_threshold) * 100);
+  const growthLabel = s.is_max ? '최고 단계 달성!' : `${fmt(p.growth)} / ${s.next_threshold} → ${s.next_name}`;
+  el.innerHTML = `
+    <div class="pet-emoji">${s.emoji}</div>
+    <div class="pet-name">${p.name}</div>
+    <div class="pet-stage-name">${s.name} 단계 · 방치해도 분당 +${(p.growth_per_sec * 60).toFixed(0)} 성장</div>
+    <div class="pet-growth-wrap">
+      <div class="pet-growth-label"><span>성장치</span><span>${growthLabel}</span></div>
+      <div class="pet-growth-bar-bg"><div class="pet-growth-bar-fill" style="width:${progress}%"></div></div>
+    </div>
+    <button class="feed-btn" ${canFeed ? '' : 'disabled'}>🍖 먹이주기 (${fmt(p.feed_cost)}💰)</button>
+    <div class="pet-coin-line">내 코인: ${fmt(coins)}💰</div>
+  `;
+  el.querySelector('.feed-btn').addEventListener('click', feedPet);
+}
+
+async function loadPet() {
+  try {
+    petState = await apiGet(`/api/pet?initData=${encodeURIComponent(initData)}`);
+    renderPetScreen();
+  } catch (e) {
+    $('#screen-pet').innerHTML = `<div class="center-msg">펫을 못 불러왔어: ${e.detail || ''}</div>`;
+  }
+}
+
+async function feedPet() {
+  try {
+    const r = await apiPost('/api/pet/feed', { initData });
+    petState = r.pet;
+    if (state) state.coins = r.coins;
+    renderPetScreen();
+    showToast('🍖 냠냠! 성장치 +' + 50);
+  } catch (e) {
+    showToast(`❌ ${e.detail || '먹이주기 실패'}`);
+  }
+}
+
 // ===== 네비게이션 =====
 document.querySelectorAll('nav button').forEach((btn) => {
   btn.addEventListener('click', () => {
@@ -358,6 +426,13 @@ document.querySelectorAll('nav button').forEach((btn) => {
     const name = btn.dataset.screen;
     $(`#screen-${name}`).classList.add('active');
     if (name === 'rank') renderRank();
+
+    petTabActive = (name === 'pet');
+    clearInterval(petPollTimer);
+    if (petTabActive) {
+      loadPet();
+      petPollTimer = setInterval(loadPet, 5000); // 방치 성장이 눈에 보이게 5초마다 새로고침
+    }
   });
 });
 
