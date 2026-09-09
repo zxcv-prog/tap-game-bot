@@ -40,23 +40,17 @@
   #screen-home { align-items: center; justify-content: space-between; }
   .tap-zone { flex: 1; display: flex; align-items: center; justify-content: center; width: 100%; position: relative; }
   #tap-btn {
-    width: 62vw; height: 62vw; max-width: 260px; max-height: 260px;
-    border-radius: 50%; border: none; cursor: pointer;
-    background: radial-gradient(circle at 35% 30%, var(--accent), var(--accent2) 70%);
-    box-shadow: 0 10px 0 #b96e12, 0 14px 24px rgba(0,0,0,.4);
-    font-size: 64px; display: flex; align-items: center; justify-content: center;
-    transition: transform .06s, box-shadow .06s;
-    overflow: hidden; padding: 0;
+    width: 78vw; height: 78vw; max-width: 320px; max-height: 320px;
+    border: none; cursor: pointer; background: transparent; padding: 0;
+    display: flex; align-items: center; justify-content: center;
+    transition: transform .06s;
   }
   #tap-btn img {
-    width: 70%; height: 70%; object-fit: contain;
+    width: 100%; height: 100%; object-fit: contain;
     image-rendering: pixelated; pointer-events: none; -webkit-user-drag: none;
-    filter: drop-shadow(0 4px 6px rgba(0,0,0,.4));
+    filter: drop-shadow(0 8px 14px rgba(0,0,0,.5));
   }
-  #tap-btn:active, #tap-btn.pressed {
-    transform: translateY(8px);
-    box-shadow: 0 2px 0 #b96e12, 0 6px 14px rgba(0,0,0,.4);
-  }
+  #tap-btn:active, #tap-btn.pressed { transform: scale(0.92); }
   #tap-btn.depleted { filter: grayscale(.6) brightness(.6); }
   .floater {
     position: absolute; pointer-events: none; font-weight: 800; font-size: 22px;
