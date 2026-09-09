@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS users (
     first_name TEXT NOT NULL,
     username TEXT,
     coins REAL NOT NULL DEFAULT 0,
+    total_earned REAL NOT NULL DEFAULT 0,
     tap_level INTEGER NOT NULL DEFAULT 0,
     energy_level INTEGER NOT NULL DEFAULT 0,
     miner_level INTEGER NOT NULL DEFAULT 0,
@@ -46,6 +47,11 @@ def passive_per_sec(miner_level: int) -> int:
 
 async def init_schema(client) -> None:
     await client.execute(SCHEMA)
+    try:
+        # 기존에 배포되어 있던 테이블에는 이 컬럼이 없을 수 있어 마이그레이션으로 추가 (이미 있으면 에러 무시)
+        await client.execute("ALTER TABLE users ADD COLUMN total_earned REAL NOT NULL DEFAULT 0")
+    except Exception:
+        pass
 
 
 def _public_state(row: dict) -> dict:
@@ -75,7 +81,9 @@ def _recompute(row: dict, now: float) -> dict:
     elapsed = max(0.0, now - row["last_update"])
     row = dict(row)
     row["energy"] = min(max_energy_for(row["energy_level"]), row["energy"] + elapsed * ENERGY_REGEN_PER_SEC)
-    row["coins"] = row["coins"] + elapsed * passive_per_sec(row["miner_level"])
+    passive_gain = elapsed * passive_per_sec(row["miner_level"])
+    row["coins"] = row["coins"] + passive_gain
+    row["total_earned"] = row.get("total_earned", 0) + passive_gain
     row["last_update"] = now
     return row
 
@@ -89,10 +97,10 @@ async def _fetch_row(client, telegram_id: int) -> dict | None:
 
 async def _save_row(client, row: dict) -> None:
     await client.execute(
-        "UPDATE users SET coins=?, energy=?, last_update=?, tap_level=?, energy_level=?, miner_level=?, "
+        "UPDATE users SET coins=?, total_earned=?, energy=?, last_update=?, tap_level=?, energy_level=?, miner_level=?, "
         "first_name=?, username=? WHERE telegram_id=?",
         [
-            row["coins"], row["energy"], row["last_update"],
+            row["coins"], row["total_earned"], row["energy"], row["last_update"],
             row["tap_level"], row["energy_level"], row["miner_level"],
             row["first_name"], row["username"], row["telegram_id"],
         ],
@@ -105,8 +113,8 @@ async def get_or_create_user(client, tg_user: dict) -> dict:
     row = await _fetch_row(client, tg_id)
     if row is None:
         await client.execute(
-            "INSERT INTO users (telegram_id, first_name, username, coins, tap_level, energy_level, miner_level, energy, last_update) "
-            "VALUES (?, ?, ?, 0, 0, 0, 0, ?, ?)",
+            "INSERT INTO users (telegram_id, first_name, username, coins, total_earned, tap_level, energy_level, miner_level, energy, last_update) "
+            "VALUES (?, ?, ?, 0, 0, 0, 0, 0, ?, ?)",
             [tg_id, tg_user.get("first_name", "플레이어"), tg_user.get("username"), BASE_MAX_ENERGY, now],
         )
         row = await _fetch_row(client, tg_id)
@@ -127,8 +135,10 @@ async def apply_tap(client, telegram_id: int, tap_count: int) -> dict:
 
     available = int(row["energy"])
     accepted = min(tap_count, available)
+    gain = accepted * coins_per_tap(row["tap_level"])
     row["energy"] -= accepted
-    row["coins"] += accepted * coins_per_tap(row["tap_level"])
+    row["coins"] += gain
+    row["total_earned"] = row.get("total_earned", 0) + gain
 
     await _save_row(client, row)
     state = _public_state(row)
@@ -156,8 +166,9 @@ async def apply_upgrade(client, telegram_id: int, upgrade_id: str) -> dict:
 
 
 async def get_leaderboard(client, limit: int = 20) -> list[dict]:
+    # 현재 잔액(coins)이 아니라 역대 누적 획득량(total_earned, 상점에서 소모한 것도 포함) 기준으로 순위를 매김
     rs = await client.execute(
-        "SELECT telegram_id, first_name, coins FROM users ORDER BY coins DESC LIMIT ?", [limit]
+        "SELECT telegram_id, first_name, total_earned FROM users ORDER BY total_earned DESC LIMIT ?", [limit]
     )
     result = []
     for i, r in enumerate(rs.rows):
@@ -166,6 +177,6 @@ async def get_leaderboard(client, limit: int = 20) -> list[dict]:
             "rank": i + 1,
             "telegram_id": d["telegram_id"],
             "first_name": d["first_name"],
-            "coins": round(d["coins"]),
+            "coins": round(d["total_earned"]),
         })
     return result
