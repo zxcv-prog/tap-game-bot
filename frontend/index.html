@@ -46,6 +46,12 @@
     box-shadow: 0 10px 0 #b96e12, 0 14px 24px rgba(0,0,0,.4);
     font-size: 64px; display: flex; align-items: center; justify-content: center;
     transition: transform .06s, box-shadow .06s;
+    overflow: hidden; padding: 0;
+  }
+  #tap-btn img {
+    width: 70%; height: 70%; object-fit: contain;
+    image-rendering: pixelated; pointer-events: none; -webkit-user-drag: none;
+    filter: drop-shadow(0 4px 6px rgba(0,0,0,.4));
   }
   #tap-btn:active, #tap-btn.pressed {
     transform: translateY(8px);
@@ -128,7 +134,7 @@
 
   <section id="screen-home" class="screen active">
     <div class="tap-zone">
-      <button id="tap-btn">💰</button>
+      <button id="tap-btn"><img src="/assets/tap-icon.png" alt="탭" /></button>
     </div>
     <div class="energy-wrap">
       <div class="energy-label"><span>⚡ 에너지</span><span id="energy-text">0 / 0</span></div>
